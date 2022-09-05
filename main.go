@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt"
 	env "github.com/joho/godotenv"
 	"golang.org/x/crypto/bcrypt"
 
@@ -23,10 +25,12 @@ import (
 // TODO: set up with pscale
 
 type User struct {
-	ID       int    `json:"id"`
-	Username string `json:"username"`
-	Email    string `json:"email"`
-	Pw       string `json:"pw"`
+	ID        int    `json:"id"`
+	Username  string `json:"username"`
+	Email     string `json:"email"`
+	Pw        string `json:"pw"`
+	CreatedAt string `json:"createdAt"`
+	UpdatedAt string `json:"updatedAt"`
 }
 
 func main() {
@@ -35,6 +39,7 @@ func main() {
 
 	router.GET("/users", getAllUsers)
 	router.POST("/register", createNewUser)
+	router.POST("/login", loginUser)
 
 	router.Run("localhost:8080")
 }
@@ -113,5 +118,63 @@ func createNewUser(context *gin.Context) {
 	}
 
 	// return new user id to client
-	context.IndentedJSON(http.StatusAccepted, newUser.ID)
+	context.Status(http.StatusAccepted)
+}
+
+func loginUser(context *gin.Context) {
+	// get user from request
+	var userFromRequest User
+	err := context.BindJSON(&userFromRequest)
+	if err != nil {
+		context.IndentedJSON(http.StatusBadRequest, gin.H{"error": "malformed request"})
+		return
+	}
+
+	// connect to db
+	db := getAuthDbConnection()
+	defer db.Close()
+
+	// lookup user in db
+	var userFromDb User
+	row := db.QueryRow("SELECT id, username, email, pw FROM users WHERE username = ? OR email = ?", userFromRequest.Username, userFromRequest.Email)
+	err = row.Scan(&userFromDb.ID, &userFromDb.Username, &userFromDb.Email, &userFromDb.Pw)
+	if err != nil {
+		context.IndentedJSON(http.StatusBadRequest, err)
+		return
+	}
+
+	// verify the password from request and db match
+	err = bcrypt.CompareHashAndPassword([]byte(userFromDb.Pw), []byte(userFromRequest.Pw))
+	if err != nil {
+		context.Status(http.StatusUnauthorized)
+		return
+	}
+
+	// create jwt
+	// TODO: add correct claims
+	unsignedJwt := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"foo": "bar",
+		"nbf": time.Date(2015, 10, 10, 12, 0, 0, 0, time.UTC).Unix(),
+	})
+
+	// sign jwt
+	signedJwt, err := unsignedJwt.SignedString([]byte(os.Getenv("JWT_SECRET")))
+	if err != nil {
+		context.Status(http.StatusUnauthorized)
+		return
+	}
+
+	// attach a jwt token to reponse, security reference: https://dev.to/gkoniaris/how-to-securely-store-jwt-tokens-51cf
+	context.SetCookie(
+		"Authorization",
+		fmt.Sprintf("Bearer %s", signedJwt),
+		60*60*24,
+		"/",
+		"localhost",
+		false,
+		true)
+	context.SetSameSite(http.SameSiteStrictMode)
+
+	// return an ok status
+	context.IndentedJSON(http.StatusOK, gin.H{"jwt": signedJwt})
 }
