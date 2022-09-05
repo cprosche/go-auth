@@ -24,7 +24,7 @@ func main() {
 	loadEnv()
 	router := gin.Default()
 	router.GET("/users", getAllUsers)
-	router.POST("/register", getAllUsers)
+	router.POST("/register", createNewUser)
 	fmt.Println("Listening at http://localhost:8080")
 	router.Run("localhost:8080")
 }
@@ -64,4 +64,28 @@ func getAuthDbConnection() *sql.DB {
 		fmt.Println(err.Error())
 	}
 	return db
+}
+
+func createNewUser(context *gin.Context) {
+	var newUser User
+	err := context.BindJSON(&newUser)
+	if err != nil {
+		context.IndentedJSON(http.StatusBadRequest, gin.H{"message": "malformed request"})
+		return
+	}
+
+	db := getAuthDbConnection()
+	defer db.Close()
+
+	sql := "INSERT INTO users(username, email, pw) VALUES (?, ?, ?)"
+	_, err = db.Exec(sql, newUser.Username, newUser.Email, newUser.Pw)
+	if err != nil {
+		context.IndentedJSON(http.StatusBadRequest, err)
+		return
+	}
+
+	row := db.QueryRow("SELECT id, username, email, pw FROM users WHERE username = ?", newUser.Username)
+	row.Scan(&newUser.ID, &newUser.Username, &newUser.Email, &newUser.Pw)
+
+	context.IndentedJSON(http.StatusAccepted, newUser)
 }

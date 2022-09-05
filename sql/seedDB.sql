@@ -20,9 +20,16 @@ VALUES(
         'bri',
         'brihadley@gmail.com',
         'password2'
+    ),
+    (
+        'dave',
+        'dave@gmail.com',
+        'password3'
     );
 -- @block
 SELECT *
 FROM users;
 -- @block
 CREATE DATABASE auth;
+-- @block
+DELETE FROM users;
