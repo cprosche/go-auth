@@ -9,7 +9,7 @@ import (
 
 	_ "github.com/go-sql-driver/mysql"
 
-	fn "github.com/cprosche/auth/functions"
+	ctrl "github.com/cprosche/auth/controllers"
 )
 
 // nodemon --exec go run main.go --ext go
@@ -30,15 +30,15 @@ func initRoutes(router *gin.Engine) {
 	{
 		auth := v1.Group("/auth")
 		{
-			auth.POST("/register", fn.CreateNewUser) // create user
-			auth.POST("/login", fn.LoginUser)
+			auth.POST("/register", ctrl.CreateNewUser) // create user
+			auth.POST("/login", ctrl.LoginUser)
 		}
 		users := v1.Group("/users")
 		{
-			users.GET("/", fn.GetAllUsers)     // get all users
-			users.GET("/me", fn.GetUser)       // get single user
-			users.POST("/me", fn.UpdateUser)   // update single user
-			users.DELETE("/me", fn.DeleteUser) // update single user
+			users.GET("/", ctrl.GetAllUsers)     // get all users
+			users.GET("/me", ctrl.GetUser)       // get single user
+			users.POST("/me", ctrl.UpdateUser)   // update single user
+			users.DELETE("/me", ctrl.DeleteUser) // update single user
 		}
 	}
 }
