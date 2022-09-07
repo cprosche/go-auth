@@ -1,6 +1,9 @@
 package main
 
 import (
+	"fmt"
+	"os"
+
 	"github.com/gin-gonic/gin"
 	env "github.com/joho/godotenv"
 
@@ -19,7 +22,7 @@ func main() {
 	loadEnv()
 	router := gin.Default()
 	initRoutes(router)
-	router.Run("localhost:8080")
+	router.Run(fmt.Sprintf("localhost:%s", os.Getenv("PORT")))
 }
 
 func initRoutes(router *gin.Engine) {

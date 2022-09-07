@@ -12,23 +12,6 @@ CREATE TABLE users(
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 -- @block
-INSERT INTO users (username, email, pw)
-VALUES(
-        'caderosche',
-        'caderosche@gmail.com',
-        'password'
-    ),
-    (
-        'bri',
-        'brihadley@gmail.com',
-        'password2'
-    ),
-    (
-        'dave',
-        'dave@gmail.com',
-        'password3'
-    );
--- @block
 SELECT *
 FROM users;
 -- @block

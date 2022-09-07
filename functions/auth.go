@@ -2,9 +2,12 @@ package functions
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -21,6 +24,14 @@ type FullUser struct {
 	UpdatedAt string `json:"updatedAt"`
 }
 
+type SafeUser struct {
+	ID        int    `json:"id"`
+	Username  string `json:"username"`
+	Email     string `json:"email"`
+	CreatedAt string `json:"createdAt"`
+	UpdatedAt string `json:"updatedAt"`
+}
+
 func getAuthDbConnection() *sql.DB {
 	db, err := sql.Open("mysql", os.Getenv("DSN"))
 	if err != nil {
@@ -29,7 +40,62 @@ func getAuthDbConnection() *sql.DB {
 	return db
 }
 
-func GetUser(context *gin.Context) {}
+func ValidateToken(signedToken string) (int, error) {
+	token, err := jwt.ParseWithClaims(
+		signedToken,
+		&jwt.StandardClaims{},
+		func(token *jwt.Token) (interface{}, error) {
+			return []byte(os.Getenv("JWT_SECRET")), nil
+		},
+	)
+	if err != nil {
+		return 0, err
+	}
+	claims, ok := token.Claims.(*jwt.StandardClaims)
+	if !ok {
+		return 0, errors.New("couldn't parse claims")
+	}
+	if claims.ExpiresAt < time.Now().Unix() {
+		return 0, errors.New("token expired")
+	}
+	id, err := strconv.Atoi(claims.Subject)
+	if err != nil {
+		return 0, err
+	}
+	return id, nil
+}
+
+func GetUser(context *gin.Context) {
+	// get the token from the header
+	bearer := context.GetHeader("Authorization")
+	if bearer == "" {
+		context.Status(http.StatusUnauthorized)
+		return
+	}
+	signedToken := strings.Replace(bearer, "Bearer ", "", -1)
+
+	// validate the token
+	userId, err := ValidateToken(signedToken)
+	if err != nil {
+		context.Status(http.StatusUnauthorized)
+		return
+	}
+
+	// connect to db
+	db := getAuthDbConnection()
+	defer db.Close()
+
+	// get user from db
+	var user SafeUser
+	row := db.QueryRow("SELECT id, username, email, created_at, updated_at FROM users WHERE id = ?", userId)
+	err = row.Scan(&user.ID, &user.Username, &user.Email, &user.CreatedAt, &user.UpdatedAt)
+	if err != nil {
+		context.Status(http.StatusUnauthorized)
+		return
+	}
+
+	context.IndentedJSON(http.StatusOK, user)
+}
 
 func UpdateUser(context *gin.Context) {}
 
@@ -39,7 +105,7 @@ func GetAllUsers(context *gin.Context) {
 	db := getAuthDbConnection()
 	defer db.Close()
 
-	results, err := db.Query("SELECT id, username, email, pw FROM users")
+	results, err := db.Query("SELECT id, username, email, pw, created_at, updated_at FROM users")
 	if err != nil {
 		panic(err.Error())
 	}
@@ -47,10 +113,18 @@ func GetAllUsers(context *gin.Context) {
 	var users []FullUser
 	for results.Next() {
 		var user FullUser
-		err = results.Scan(&user.ID, &user.Username, &user.Email, &user.Pw)
+		err = results.Scan(
+			&user.ID,
+			&user.Username,
+			&user.Email,
+			&user.Pw,
+			&user.CreatedAt,
+			&user.UpdatedAt)
+
 		if err != nil {
 			panic(err.Error())
 		}
+
 		users = append(users, user)
 	}
 
@@ -102,7 +176,7 @@ func LoginUser(context *gin.Context) {
 	var userFromRequest FullUser
 	err := context.BindJSON(&userFromRequest)
 	if err != nil {
-		context.IndentedJSON(http.StatusBadRequest, gin.H{"error": "malformed request"})
+		context.Status(http.StatusBadRequest)
 		return
 	}
 
@@ -115,7 +189,7 @@ func LoginUser(context *gin.Context) {
 	row := db.QueryRow("SELECT id, username, email, pw FROM users WHERE username = ? OR email = ?", userFromRequest.Username, userFromRequest.Email)
 	err = row.Scan(&userFromDb.ID, &userFromDb.Username, &userFromDb.Email, &userFromDb.Pw)
 	if err != nil {
-		context.IndentedJSON(http.StatusBadRequest, err)
+		context.Status(http.StatusBadRequest)
 		return
 	}
 
@@ -127,10 +201,11 @@ func LoginUser(context *gin.Context) {
 	}
 
 	// create jwt
-	// TODO: add correct claims
-	unsignedJwt := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"foo": "bar",
-		"nbf": time.Date(2015, 10, 10, 12, 0, 0, 0, time.UTC).Unix(),
+	unsignedJwt := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.StandardClaims{
+		Issuer:    "github.com/cprosche",
+		Subject:   strconv.Itoa(userFromDb.ID),
+		IssuedAt:  time.Now().Unix(),
+		ExpiresAt: time.Now().Add(4 * time.Hour).Unix(),
 	})
 
 	// sign jwt
