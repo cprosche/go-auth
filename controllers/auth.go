@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"os"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -67,12 +66,12 @@ func ValidateToken(signedToken string) (int, error) {
 
 func ValidateTokenHandler(context *gin.Context) {
 	// get the token from the header
-	bearer := context.GetHeader("Authorization")
-	if bearer == "" {
+	authCookie, err := context.Request.Cookie("Authorization")
+	if err != nil {
 		context.Status(http.StatusUnauthorized)
 		return
 	}
-	signedToken := strings.Replace(bearer, "Bearer ", "", -1)
+	signedToken := authCookie.Value[7:len(authCookie.Value)]
 
 	// validate the token
 	userId, err := ValidateToken(signedToken)
@@ -147,14 +146,14 @@ func CreateNewUser(context *gin.Context) {
 	var newUser FullUser
 	err := context.BindJSON(&newUser)
 	if err != nil {
-		context.Status(http.StatusBadGateway)
+		context.Status(http.StatusBadRequest)
 		return
 	}
 
 	// generate a hash from the password
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(newUser.Pw), bcrypt.DefaultCost)
+	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte(newUser.Pw), bcrypt.DefaultCost)
 	if err != nil {
-		context.IndentedJSON(http.StatusBadRequest, gin.H{"error": "password hashing failed"})
+		context.Status(http.StatusBadRequest)
 		return
 	}
 
@@ -226,16 +225,17 @@ func LoginUser(context *gin.Context) {
 		return
 	}
 
+	// TODO: fix this cookie before prod
 	// attach a jwt token to reponse, security reference: https://dev.to/gkoniaris/how-to-securely-store-jwt-tokens-51cf
 	context.SetCookie(
 		"Authorization",
 		fmt.Sprintf("Bearer %s", signedJwt),
 		60*60*24,
-		"/",
+		"",
 		"localhost",
-		true,
-		true)
-	context.SetSameSite(http.SameSiteStrictMode)
+		false,
+		false)
+	// context.SetSameSite(http.SameSiteStrictMode)
 
 	// return token in body when developing
 	if os.Getenv("CURRENT_ENV") == "development" {
