@@ -12,8 +12,6 @@ import (
 	ctrl "github.com/cprosche/auth/controllers"
 )
 
-// nodemon --exec go run main.go --ext go
-
 // TODO: password validation
 // TODO: ip address restriction? maybe on deployment server not app
 // TODO: set up with pscale
@@ -35,10 +33,10 @@ func initRoutes(router *gin.Engine) {
 		}
 		users := v1.Group("/users")
 		{
-			users.GET("/", ctrl.GetAllUsers)     // get all users
-			users.GET("/me", ctrl.GetUser)       // get single user
-			users.POST("/me", ctrl.UpdateUser)   // update single user
-			users.DELETE("/me", ctrl.DeleteUser) // update single user
+			users.GET("/", ctrl.GetAllUsers)                          // get all users
+			users.GET("/me", ctrl.ValidateTokenHandler, ctrl.GetUser) // get single user
+			users.POST("/me", ctrl.UpdateUser)                        // update single user
+			users.DELETE("/me", ctrl.DeleteUser)                      // update single user
 		}
 	}
 }
@@ -49,3 +47,5 @@ func loadEnv() {
 		panic("Error loading environment variables")
 	}
 }
+
+// nodemon --exec go run main.go --ext go

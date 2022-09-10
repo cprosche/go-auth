@@ -65,7 +65,7 @@ func ValidateToken(signedToken string) (int, error) {
 	return id, nil
 }
 
-func GetUser(context *gin.Context) {
+func ValidateTokenHandler(context *gin.Context) {
 	// get the token from the header
 	bearer := context.GetHeader("Authorization")
 	if bearer == "" {
@@ -80,6 +80,17 @@ func GetUser(context *gin.Context) {
 		context.Status(http.StatusUnauthorized)
 		return
 	}
+	context.Set("userId", userId)
+	context.Next()
+}
+
+func GetUser(context *gin.Context) {
+	// get user id from the moddleware
+	userId, ok := context.Get("userId")
+	if !ok {
+		context.Status(http.StatusUnauthorized)
+		return
+	}
 
 	// connect to db
 	db := getAuthDbConnection()
@@ -88,7 +99,7 @@ func GetUser(context *gin.Context) {
 	// get user from db
 	var user SafeUser
 	row := db.QueryRow("SELECT id, username, email, created_at, updated_at FROM users WHERE id = ?", userId)
-	err = row.Scan(&user.ID, &user.Username, &user.Email, &user.CreatedAt, &user.UpdatedAt)
+	err := row.Scan(&user.ID, &user.Username, &user.Email, &user.CreatedAt, &user.UpdatedAt)
 	if err != nil {
 		context.Status(http.StatusUnauthorized)
 		return
@@ -136,7 +147,7 @@ func CreateNewUser(context *gin.Context) {
 	var newUser FullUser
 	err := context.BindJSON(&newUser)
 	if err != nil {
-		context.IndentedJSON(http.StatusBadRequest, gin.H{"error": "malformed request"})
+		context.Status(http.StatusBadGateway)
 		return
 	}
 
@@ -168,7 +179,7 @@ func CreateNewUser(context *gin.Context) {
 	}
 
 	// return new user id to client
-	context.Status(http.StatusAccepted)
+	context.Status(http.StatusCreated)
 }
 
 func LoginUser(context *gin.Context) {
@@ -222,10 +233,16 @@ func LoginUser(context *gin.Context) {
 		60*60*24,
 		"/",
 		"localhost",
-		false,
+		true,
 		true)
 	context.SetSameSite(http.SameSiteStrictMode)
 
+	// return token in body when developing
+	if os.Getenv("CURRENT_ENV") == "development" {
+		context.IndentedJSON(http.StatusOK, gin.H{"token": signedJwt})
+		return
+	}
+
 	// return an ok status
-	context.IndentedJSON(http.StatusOK, gin.H{"jwt": signedJwt})
+	context.Status(http.StatusOK)
 }
