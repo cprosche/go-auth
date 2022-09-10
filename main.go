@@ -1,6 +1,9 @@
 package main
 
 import (
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	"os"
 
@@ -16,9 +19,11 @@ import (
 // TODO: ip address restriction? maybe on deployment server not app
 // TODO: set up with pscale
 // TODO: rate limiting?
+// TODO: add signing and verifying with RSA key
 
 func main() {
 	loadEnv()
+	// key := GetRSAKey()
 	router := gin.Default()
 	initRoutes(router)
 	router.Run(fmt.Sprintf("localhost:%s", os.Getenv("PORT")))
@@ -63,6 +68,13 @@ func CORSMiddleware(context *gin.Context) {
 	}
 
 	context.Next()
+}
+
+func GetRSAKey() *rsa.PrivateKey {
+	block, _ := pem.Decode([]byte(os.Getenv("PRIVATE_KEY")))
+	parseResult, _ := x509.ParsePKCS8PrivateKey(block.Bytes)
+	key := parseResult.(*rsa.PrivateKey)
+	return key
 }
 
 // nodemon --exec go run main.go --ext go
