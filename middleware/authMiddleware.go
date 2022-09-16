@@ -17,16 +17,22 @@ func ValidateTokenHandler(context *gin.Context) {
 	} else {
 		authCookie, err = context.Cookie("Authorization")
 		if err != nil {
-			context.AbortWithStatus(http.StatusUnauthorized)
+			context.Status(http.StatusUnauthorized)
+			return
 		}
 	}
 
 	signedToken := authCookie[7:]
+	if signedToken == "" {
+		context.Status(http.StatusBadRequest)
+		return
+	}
 
 	// validate the token
 	userId, err := utils.ValidateToken(signedToken)
 	if err != nil {
-		context.AbortWithStatus(http.StatusUnauthorized)
+		context.Status(http.StatusUnauthorized)
+		return
 	}
 
 	// set user id and continue

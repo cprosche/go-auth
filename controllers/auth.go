@@ -42,7 +42,8 @@ func GetUser(context *gin.Context) {
 	// get user id from the moddleware
 	userId, ok := context.Get("userId")
 	if !ok {
-		context.AbortWithStatus(http.StatusUnauthorized)
+		context.Status(http.StatusUnauthorized)
+		return
 	}
 
 	// connect to db
@@ -54,7 +55,8 @@ func GetUser(context *gin.Context) {
 	row := db.QueryRow("SELECT id, username, email, created_at, updated_at FROM users WHERE id = ?", userId)
 	err := row.Scan(&user.ID, &user.Username, &user.Email, &user.CreatedAt, &user.UpdatedAt)
 	if err != nil {
-		context.AbortWithStatus(http.StatusUnauthorized)
+		context.Status(http.StatusUnauthorized)
+		return
 	}
 
 	context.IndentedJSON(http.StatusOK, user)
@@ -118,7 +120,7 @@ func CreateNewUser(context *gin.Context) {
 	sql := "INSERT INTO users(username, email, pw) VALUES (?, ?, ?)"
 	_, err = db.Exec(sql, newUser.Username, newUser.Email, hashedPassword)
 	if err != nil {
-		context.IndentedJSON(http.StatusBadRequest, err)
+		context.Status(http.StatusBadRequest)
 		return
 	}
 
@@ -126,7 +128,7 @@ func CreateNewUser(context *gin.Context) {
 	row := db.QueryRow("SELECT id, username, email, pw FROM users WHERE username = ?", newUser.Username)
 	err = row.Scan(&newUser.ID, &newUser.Username, &newUser.Email, &newUser.Pw)
 	if err != nil {
-		context.IndentedJSON(http.StatusBadRequest, err)
+		context.Status(http.StatusBadRequest)
 		return
 	}
 
@@ -159,11 +161,12 @@ func LoginUser(context *gin.Context) {
 	// verify the password from request and db match
 	err = bcrypt.CompareHashAndPassword([]byte(userFromDb.Pw), []byte(userFromRequest.Pw))
 	if err != nil {
-		context.AbortWithStatus(http.StatusUnauthorized)
+		context.Status(http.StatusUnauthorized)
+		return
 	}
 
 	// create jwt
-	unsignedJwt := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.StandardClaims{
+	unsignedJwt := jwt.NewWithClaims(jwt.SigningMethodRS256, jwt.StandardClaims{
 		Issuer:    "github.com/cprosche",
 		Subject:   strconv.Itoa(userFromDb.ID),
 		IssuedAt:  time.Now().Unix(),
@@ -171,9 +174,10 @@ func LoginUser(context *gin.Context) {
 	})
 
 	// sign jwt
-	signedJwt, err := unsignedJwt.SignedString([]byte(inits.HMAC_KEY))
+	signedJwt, err := unsignedJwt.SignedString(inits.RSA_KEY)
 	if err != nil {
-		context.AbortWithStatus(http.StatusUnauthorized)
+		context.Status(http.StatusUnauthorized)
+		return
 	}
 
 	// TODO: fix this cookie before prod

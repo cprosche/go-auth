@@ -5,10 +5,10 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
-	"os"
 	"strconv"
 	"time"
 
+	"github.com/cprosche/auth/inits"
 	"github.com/golang-jwt/jwt"
 )
 
@@ -17,7 +17,7 @@ func ValidateToken(signedToken string) (int, error) {
 		signedToken,
 		&jwt.StandardClaims{},
 		func(token *jwt.Token) (interface{}, error) {
-			return []byte(os.Getenv("JWT_SECRET")), nil
+			return inits.RSA_KEY.Public(), nil
 		},
 	)
 	if err != nil {

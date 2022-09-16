@@ -14,7 +14,8 @@ func CORSMiddleware(context *gin.Context) {
 	context.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT")
 
 	if context.Request.Method == "OPTIONS" {
-		context.AbortWithStatus(http.StatusNoContent)
+		context.Status(http.StatusNoContent)
+		return
 	}
 
 	context.Next()
