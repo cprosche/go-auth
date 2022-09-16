@@ -45,11 +45,6 @@ func init() {
 		panic("Current env loading error")
 	}
 
-	inits.HMAC_KEY = os.Getenv("JWT_SECRET")
-	if inits.HMAC_KEY == "" {
-		panic("Hmac key loading error")
-	}
-
 }
 
 func main() {

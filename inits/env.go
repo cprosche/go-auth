@@ -10,7 +10,6 @@ var PORT string
 var PRIVATE_KEY string
 var AUTH_DSN string
 var CURRENT_ENV string
-var HMAC_KEY string
 var RSA_KEY *rsa.PrivateKey
 
 func LoadEnv() {
