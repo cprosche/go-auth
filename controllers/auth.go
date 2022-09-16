@@ -2,13 +2,12 @@ package controllers
 
 import (
 	"database/sql"
-	"errors"
 	"fmt"
 	"net/http"
-	"os"
 	"strconv"
 	"time"
 
+	"github.com/cprosche/auth/inits"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt"
 	"golang.org/x/crypto/bcrypt"
@@ -32,63 +31,18 @@ type SafeUser struct {
 }
 
 func getAuthDbConnection() *sql.DB {
-	db, err := sql.Open("mysql", os.Getenv("DSN"))
+	db, err := sql.Open("mysql", inits.AUTH_DSN)
 	if err != nil {
 		fmt.Println(err.Error())
 	}
 	return db
 }
 
-func ValidateToken(signedToken string) (int, error) {
-	token, err := jwt.ParseWithClaims(
-		signedToken,
-		&jwt.StandardClaims{},
-		func(token *jwt.Token) (interface{}, error) {
-			return []byte(os.Getenv("JWT_SECRET")), nil
-		},
-	)
-	if err != nil {
-		return 0, err
-	}
-	claims, ok := token.Claims.(*jwt.StandardClaims)
-	if !ok {
-		return 0, errors.New("couldn't parse claims")
-	}
-	if claims.ExpiresAt < time.Now().Unix() {
-		return 0, errors.New("token expired")
-	}
-	id, err := strconv.Atoi(claims.Subject)
-	if err != nil {
-		return 0, err
-	}
-	return id, nil
-}
-
-func ValidateTokenHandler(context *gin.Context) {
-	// get the token from the header
-	authCookie, err := context.Request.Cookie("Authorization")
-	if err != nil {
-		context.Status(http.StatusUnauthorized)
-		return
-	}
-	signedToken := authCookie.Value[7:len(authCookie.Value)]
-
-	// validate the token
-	userId, err := ValidateToken(signedToken)
-	if err != nil {
-		context.Status(http.StatusUnauthorized)
-		return
-	}
-	context.Set("userId", userId)
-	context.Next()
-}
-
 func GetUser(context *gin.Context) {
 	// get user id from the moddleware
 	userId, ok := context.Get("userId")
 	if !ok {
-		context.Status(http.StatusUnauthorized)
-		return
+		context.AbortWithStatus(http.StatusUnauthorized)
 	}
 
 	// connect to db
@@ -100,8 +54,7 @@ func GetUser(context *gin.Context) {
 	row := db.QueryRow("SELECT id, username, email, created_at, updated_at FROM users WHERE id = ?", userId)
 	err := row.Scan(&user.ID, &user.Username, &user.Email, &user.CreatedAt, &user.UpdatedAt)
 	if err != nil {
-		context.Status(http.StatusUnauthorized)
-		return
+		context.AbortWithStatus(http.StatusUnauthorized)
 	}
 
 	context.IndentedJSON(http.StatusOK, user)
@@ -206,8 +159,7 @@ func LoginUser(context *gin.Context) {
 	// verify the password from request and db match
 	err = bcrypt.CompareHashAndPassword([]byte(userFromDb.Pw), []byte(userFromRequest.Pw))
 	if err != nil {
-		context.Status(http.StatusUnauthorized)
-		return
+		context.AbortWithStatus(http.StatusUnauthorized)
 	}
 
 	// create jwt
@@ -219,10 +171,9 @@ func LoginUser(context *gin.Context) {
 	})
 
 	// sign jwt
-	signedJwt, err := unsignedJwt.SignedString([]byte(os.Getenv("JWT_SECRET")))
+	signedJwt, err := unsignedJwt.SignedString([]byte(inits.HMAC_KEY))
 	if err != nil {
-		context.Status(http.StatusUnauthorized)
-		return
+		context.AbortWithStatus(http.StatusUnauthorized)
 	}
 
 	// TODO: fix this cookie before prod
@@ -238,7 +189,7 @@ func LoginUser(context *gin.Context) {
 	// context.SetSameSite(http.SameSiteStrictMode)
 
 	// return token in body when developing
-	if os.Getenv("CURRENT_ENV") == "development" {
+	if inits.CURRENT_ENV == "development" {
 		context.IndentedJSON(http.StatusOK, gin.H{"token": signedJwt})
 		return
 	}
