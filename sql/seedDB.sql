@@ -5,7 +5,6 @@ USE auth;
 -- @block
 CREATE TABLE users(
     id INT PRIMARY KEY AUTO_INCREMENT,
-    username VARCHAR(255) UNIQUE,
     email VARCHAR(255) UNIQUE,
     pw VARCHAR(255),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/cprosche/auth/inits"
+	"github.com/cprosche/auth/utils"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt"
 	"golang.org/x/crypto/bcrypt"
@@ -15,7 +16,6 @@ import (
 
 type FullUser struct {
 	ID        int    `json:"id"`
-	Username  string `json:"username"`
 	Email     string `json:"email"`
 	Pw        string `json:"pw"`
 	CreatedAt string `json:"createdAt"`
@@ -24,7 +24,6 @@ type FullUser struct {
 
 type SafeUser struct {
 	ID        int    `json:"id"`
-	Username  string `json:"username"`
 	Email     string `json:"email"`
 	CreatedAt string `json:"createdAt"`
 	UpdatedAt string `json:"updatedAt"`
@@ -52,8 +51,8 @@ func GetUser(context *gin.Context) {
 
 	// get user from db
 	var user SafeUser
-	row := db.QueryRow("SELECT id, username, email, created_at, updated_at FROM users WHERE id = ?", userId)
-	err := row.Scan(&user.ID, &user.Username, &user.Email, &user.CreatedAt, &user.UpdatedAt)
+	row := db.QueryRow("SELECT id, email, created_at, updated_at FROM users WHERE id = ?", userId)
+	err := row.Scan(&user.ID, &user.Email, &user.CreatedAt, &user.UpdatedAt)
 	if err != nil {
 		context.Status(http.StatusUnauthorized)
 		return
@@ -70,7 +69,7 @@ func GetAllUsers(context *gin.Context) {
 	db := getAuthDbConnection()
 	defer db.Close()
 
-	results, err := db.Query("SELECT id, username, email, pw, created_at, updated_at FROM users")
+	results, err := db.Query("SELECT id, email, pw, created_at, updated_at FROM users")
 	if err != nil {
 		panic(err.Error())
 	}
@@ -80,7 +79,6 @@ func GetAllUsers(context *gin.Context) {
 		var user FullUser
 		err = results.Scan(
 			&user.ID,
-			&user.Username,
 			&user.Email,
 			&user.Pw,
 			&user.CreatedAt,
@@ -101,14 +99,20 @@ func CreateNewUser(context *gin.Context) {
 	var newUser FullUser
 	err := context.BindJSON(&newUser)
 	if err != nil {
-		context.Status(http.StatusBadRequest)
+		context.IndentedJSON(http.StatusBadRequest, gin.H{"error": "binding error"})
+		return
+	}
+
+	// check for password validity
+	if !utils.IsPasswordValid(newUser.Pw) {
+		context.IndentedJSON(http.StatusBadRequest, gin.H{"error": "invalid password"})
 		return
 	}
 
 	// generate a hash from the password
 	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte(newUser.Pw), bcrypt.DefaultCost)
 	if err != nil {
-		context.Status(http.StatusBadRequest)
+		context.IndentedJSON(http.StatusBadRequest, gin.H{"error": "hashing error"})
 		return
 	}
 
@@ -117,18 +121,18 @@ func CreateNewUser(context *gin.Context) {
 	defer db.Close()
 
 	// insert user into db
-	sql := "INSERT INTO users(username, email, pw) VALUES (?, ?, ?)"
-	_, err = db.Exec(sql, newUser.Username, newUser.Email, hashedPassword)
+	sql := "INSERT INTO users(email, pw) VALUES (?, ?)"
+	_, err = db.Exec(sql, newUser.Email, hashedPassword)
 	if err != nil {
-		context.Status(http.StatusBadRequest)
+		context.IndentedJSON(http.StatusBadRequest, gin.H{"error": "insert error"})
 		return
 	}
 
 	// query new user from db to return new id
-	row := db.QueryRow("SELECT id, username, email, pw FROM users WHERE username = ?", newUser.Username)
-	err = row.Scan(&newUser.ID, &newUser.Username, &newUser.Email, &newUser.Pw)
+	row := db.QueryRow("SELECT id, email, pw FROM users WHERE email = ?", newUser.Email)
+	err = row.Scan(&newUser.ID, &newUser.Email, &newUser.Pw)
 	if err != nil {
-		context.Status(http.StatusBadRequest)
+		context.IndentedJSON(http.StatusBadRequest, gin.H{"error": "select error"})
 		return
 	}
 
@@ -151,8 +155,8 @@ func LoginUser(context *gin.Context) {
 
 	// lookup user in db
 	var userFromDb FullUser
-	row := db.QueryRow("SELECT id, username, email, pw FROM users WHERE username = ? OR email = ?", userFromRequest.Username, userFromRequest.Email)
-	err = row.Scan(&userFromDb.ID, &userFromDb.Username, &userFromDb.Email, &userFromDb.Pw)
+	row := db.QueryRow("SELECT id, email, pw FROM users WHERE email = ?", userFromRequest.Email)
+	err = row.Scan(&userFromDb.ID, &userFromDb.Email, &userFromDb.Pw)
 	if err != nil {
 		context.Status(http.StatusBadRequest)
 		return

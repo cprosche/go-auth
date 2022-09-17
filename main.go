@@ -10,7 +10,7 @@ import (
 
 	ctrl "github.com/cprosche/auth/controllers"
 	"github.com/cprosche/auth/inits"
-	"github.com/cprosche/auth/middleware"
+	mw "github.com/cprosche/auth/middleware"
 	"github.com/cprosche/auth/utils"
 )
 
@@ -18,7 +18,6 @@ import (
 // TODO: ip address restriction? maybe on deployment server not app
 // TODO: set up with pscale
 // TODO: rate limiting?
-// TODO: add signing and verifying with RSA key
 
 func init() {
 	inits.LoadEnv()
@@ -41,10 +40,6 @@ func init() {
 	}
 
 	inits.CURRENT_ENV = os.Getenv("CURRENT_ENV")
-	if inits.CURRENT_ENV == "" {
-		panic("Current env loading error")
-	}
-
 }
 
 func main() {
@@ -54,7 +49,7 @@ func main() {
 }
 
 func initRoutes(router *gin.Engine) {
-	router.Use(middleware.CORSMiddleware)
+	router.Use(mw.CORSMiddleware)
 	v1 := router.Group("/api/v1")
 	{
 		auth := v1.Group("/auth")
@@ -64,10 +59,10 @@ func initRoutes(router *gin.Engine) {
 		}
 		users := v1.Group("/users")
 		{
-			users.GET("/", ctrl.GetAllUsers)                                // get all users
-			users.GET("/me", middleware.ValidateTokenHandler, ctrl.GetUser) // get single user
-			users.POST("/me", ctrl.UpdateUser)                              // update single user
-			users.DELETE("/me", ctrl.DeleteUser)                            // delete single user
+			users.GET("/", ctrl.GetAllUsers)                        // get all users
+			users.GET("/me", mw.ValidateTokenHandler, ctrl.GetUser) // get single user
+			users.POST("/me", ctrl.UpdateUser)                      // update single user
+			users.DELETE("/me", ctrl.DeleteUser)                    // delete single user
 		}
 	}
 }
