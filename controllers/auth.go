@@ -58,11 +58,15 @@ func GetUser(context *gin.Context) {
 		return
 	}
 
+	// TODO: add check on updated_at vs jwt issued, unauthorized if updated_at is after issued_at
+
 	context.IndentedJSON(http.StatusOK, user)
 }
 
+// TODO: create update user route
 func UpdateUser(context *gin.Context) {}
 
+// TODO: create delete user route
 func DeleteUser(context *gin.Context) {}
 
 func GetAllUsers(context *gin.Context) {
@@ -170,6 +174,7 @@ func LoginUser(context *gin.Context) {
 	}
 
 	// create jwt
+	// TODO: decrease expiration length
 	unsignedJwt := jwt.NewWithClaims(jwt.SigningMethodRS256, jwt.StandardClaims{
 		Issuer:    "github.com/cprosche",
 		Subject:   strconv.Itoa(userFromDb.ID),
@@ -184,7 +189,6 @@ func LoginUser(context *gin.Context) {
 		return
 	}
 
-	// TODO: fix this cookie before prod
 	// attach a jwt token to reponse, security reference: https://dev.to/gkoniaris/how-to-securely-store-jwt-tokens-51cf
 	context.SetCookie(
 		"Authorization",
@@ -192,15 +196,9 @@ func LoginUser(context *gin.Context) {
 		60*60*24,
 		"",
 		"localhost",
-		false,
-		false)
-	// context.SetSameSite(http.SameSiteStrictMode)
-
-	// return token in body when developing
-	if inits.CURRENT_ENV == "development" {
-		context.IndentedJSON(http.StatusOK, gin.H{"token": signedJwt})
-		return
-	}
+		true,
+		true)
+	context.SetSameSite(http.SameSiteLaxMode)
 
 	// return an ok status
 	context.Status(http.StatusOK)

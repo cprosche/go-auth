@@ -3,18 +3,18 @@ package inits
 import (
 	"crypto/rsa"
 
-	env "github.com/joho/godotenv"
+	"github.com/joho/godotenv"
 )
 
-var PORT string
-var PRIVATE_KEY string
-var AUTH_DSN string
-var CURRENT_ENV string
-var RSA_KEY *rsa.PrivateKey
+// define globals
+var (
+	PORT        string
+	PRIVATE_KEY string
+	AUTH_DSN    string
+	CURRENT_ENV string
+	RSA_KEY     *rsa.PrivateKey
+)
 
 func LoadEnv() {
-	err := env.Load(".env")
-	if err != nil {
-		panic("Error loading environment variables")
-	}
+	godotenv.Load(".env")
 }

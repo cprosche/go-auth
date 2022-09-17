@@ -14,11 +14,12 @@ import (
 	"github.com/cprosche/auth/utils"
 )
 
-// TODO: password validation
 // TODO: ip address restriction? maybe on deployment server not app
 // TODO: set up with pscale
-// TODO: rate limiting?
+// TODO: rate limiting
+// TODO: email verification on account creation
 
+// this function sets global vars, and throws errors if they aren't there
 func init() {
 	inits.LoadEnv()
 
@@ -55,14 +56,15 @@ func initRoutes(router *gin.Engine) {
 		auth := v1.Group("/auth")
 		{
 			auth.POST("/register", ctrl.CreateNewUser) // create user
-			auth.POST("/login", ctrl.LoginUser)
+			auth.POST("/login", ctrl.LoginUser)        // login user
+			// TODO: refresh user?
 		}
 		users := v1.Group("/users")
 		{
-			users.GET("/", ctrl.GetAllUsers)                        // get all users
-			users.GET("/me", mw.ValidateTokenHandler, ctrl.GetUser) // get single user
-			users.POST("/me", ctrl.UpdateUser)                      // update single user
-			users.DELETE("/me", ctrl.DeleteUser)                    // delete single user
+			users.GET("/", ctrl.GetAllUsers)                              // get all users
+			users.GET("/me", mw.ValidateTokenHandler, ctrl.GetUser)       // get single user
+			users.POST("/me", mw.ValidateTokenHandler, ctrl.UpdateUser)   // update single user
+			users.DELETE("/me", mw.ValidateTokenHandler, ctrl.DeleteUser) // delete single user
 		}
 	}
 }
