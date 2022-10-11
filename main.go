@@ -44,12 +44,12 @@ func init() {
 }
 
 func main() {
-	router := gin.Default()
-	initRoutes(router)
+	router := InitRoutes()
 	router.Run(fmt.Sprintf("localhost:%s", inits.PORT))
 }
 
-func initRoutes(router *gin.Engine) {
+func InitRoutes() *gin.Engine {
+	router := gin.Default()
 	router.Use(mw.CORSMiddleware)
 	v1 := router.Group("/api/v1")
 	{
@@ -67,6 +67,7 @@ func initRoutes(router *gin.Engine) {
 			users.DELETE("/me", mw.ValidateTokenHandler, ctrl.DeleteUser) // delete single user
 		}
 	}
+	return router
 }
 
 // nodemon --exec go run main.go --ext go

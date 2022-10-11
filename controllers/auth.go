@@ -38,7 +38,7 @@ func getAuthDbConnection() *sql.DB {
 }
 
 func GetUser(context *gin.Context) {
-	// get user id from the moddleware
+	// get user id from the middleware
 	userId, ok := context.Get("userId")
 	if !ok {
 		context.Status(http.StatusUnauthorized)
