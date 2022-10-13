@@ -63,11 +63,125 @@ func GetUser(context *gin.Context) {
 	context.IndentedJSON(http.StatusOK, user)
 }
 
-// TODO: create update user route
-func UpdateUser(context *gin.Context) {}
+// TODO: create update email route
+// TODO: add verification
+func UpdateUserEmail(context *gin.Context) {
+	// get user id from the middleware
+	userId, ok := context.Get("userId")
+	if !ok {
+		context.Status(http.StatusUnauthorized)
+		return
+	}
 
-// TODO: create delete user route
-func DeleteUser(context *gin.Context) {}
+	// expected request format
+	type RequestContract struct {
+		Email string `json:"email"`
+	}
+
+	// get email from request
+	var request RequestContract
+	err := context.BindJSON(&request)
+	if err != nil {
+		context.Status(http.StatusUnauthorized)
+		return
+	}
+
+	// connect to db
+	db := getAuthDbConnection()
+	defer db.Close()
+
+	// update email in db
+	_, err = db.Exec("UPDATE users SET email = ? WHERE id = ?", request.Email, userId)
+	if err != nil {
+		context.Status(http.StatusUnauthorized)
+		return
+	}
+
+	// returned status of accepted for update
+	context.Status(http.StatusOK)
+}
+
+// TODO: create update password route
+func UpdateUserPassword(context *gin.Context) {
+	// get user id from the middleware
+	userId, ok := context.Get("userId")
+	if !ok {
+		context.Status(http.StatusUnauthorized)
+		return
+	}
+
+	// expected request format
+	type RequestContract struct {
+		Pw string `json:"pw"`
+	}
+
+	// get email from request
+	var request RequestContract
+	err := context.BindJSON(&request)
+	if err != nil {
+		context.Status(http.StatusUnauthorized)
+		return
+	}
+
+	// check for password validity
+	if !utils.IsPasswordValid(request.Pw) {
+		context.IndentedJSON(http.StatusBadRequest, gin.H{"error": "invalid password"})
+		return
+	}
+
+	// generate a hash from the password
+	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte(request.Pw), bcrypt.DefaultCost)
+	if err != nil {
+		context.IndentedJSON(http.StatusBadRequest, gin.H{"error": "hashing error"})
+		return
+	}
+
+	// connect to db
+	db := getAuthDbConnection()
+	defer db.Close()
+
+	// update email in db
+	_, err = db.Exec("UPDATE users SET pw = ? WHERE id = ?", hashedPassword, userId)
+	if err != nil {
+		context.Status(http.StatusUnauthorized)
+		return
+	}
+
+	// returned status of accepted for update
+	context.Status(http.StatusOK)
+}
+
+func DeleteUser(context *gin.Context) {
+	// get user id from the middleware
+	userId, ok := context.Get("userId")
+	if !ok {
+		context.Status(http.StatusUnauthorized)
+		return
+	}
+
+	// connect to db
+	db := getAuthDbConnection()
+	defer db.Close()
+
+	// delete user from db
+	var user SafeUser
+	row := db.QueryRow("SELECT id, email, created_at, updated_at FROM users WHERE id = ?", userId)
+	err := row.Scan(&user.ID, &user.Email, &user.CreatedAt, &user.UpdatedAt)
+	if err != nil {
+		context.Status(http.StatusNoContent)
+		return
+	}
+
+	_, err = db.Exec("DELETE FROM users WHERE id = ?", userId)
+	if err != nil {
+		context.Status(http.StatusUnauthorized)
+		return
+	}
+
+	// TODO: add check on updated_at vs jwt issued, unauthorized if updated_at is after issued_at
+
+	context.Status(http.StatusOK)
+}
 
 func GetAllUsers(context *gin.Context) {
 	db := getAuthDbConnection()

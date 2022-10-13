@@ -15,9 +15,11 @@ import (
 )
 
 // TODO: ip address restriction? maybe on deployment server not app
-// TODO: set up with pscale
+// TODO: set up with planetscale
 // TODO: rate limiting
 // TODO: email verification on account creation
+// TODO: deploy a test app
+// TODO: set up CI/CD pipeline
 
 // this function sets global vars, and throws errors if they aren't there
 func init() {
@@ -61,10 +63,10 @@ func InitRoutes() *gin.Engine {
 		}
 		users := v1.Group("/users")
 		{
-			users.GET("/", ctrl.GetAllUsers)                              // get all users
-			users.GET("/me", mw.ValidateTokenHandler, ctrl.GetUser)       // get single user
-			users.POST("/me", mw.ValidateTokenHandler, ctrl.UpdateUser)   // update single user
-			users.DELETE("/me", mw.ValidateTokenHandler, ctrl.DeleteUser) // delete single user
+			users.GET("/", ctrl.GetAllUsers)                                 // get all users
+			users.GET("/me", mw.ValidateTokenHandler, ctrl.GetUser)          // get single user
+			users.POST("/me", mw.ValidateTokenHandler, ctrl.UpdateUserEmail) // update single user
+			users.DELETE("/me", mw.ValidateTokenHandler, ctrl.DeleteUser)    // delete single user
 		}
 	}
 	return router
